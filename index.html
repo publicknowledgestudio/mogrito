@@ -448,8 +448,8 @@
     <h1>Shape Grid Designer</h1>
 
     <div class="section">
-      <div class="section-title" onclick="toggleSection(this)">Grid Layout</div>
-      <div class="section-content">
+      <div class="section-title collapsed" onclick="toggleSection(this)">Grid Layout</div>
+      <div class="section-content collapsed">
         <div class="checkbox-group" style="margin-bottom: 12px;">
           <label class="checkbox-label">
             <input type="checkbox" id="lock-aspect">
@@ -483,12 +483,19 @@
             <option value="9:16">9:16 Mobile</option>
           </select>
         </div>
-      </div>
-    </div>
 
-    <div class="section">
-      <div class="section-title" onclick="toggleSection(this)">Shuffle & Clear</div>
-      <div class="section-content">
+        <div class="divider"></div>
+
+        <div class="control-group">
+          <label>Alternating Row Offset</label>
+          <div class="slider-with-input">
+            <input type="range" id="stagger-offset" min="-100" max="100" value="0">
+            <input type="number" id="stagger-number" min="-100" max="100" value="0">
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
         <div class="control-group">
           <label>Random Seed (Shuffle Pixels)</label>
           <div class="slider-with-input">
@@ -501,22 +508,11 @@
       </div>
     </div>
 
-    <div class="section">
-      <div class="section-title" onclick="toggleSection(this)">Stagger Offset</div>
-      <div class="section-content">
-        <div class="control-group">
-          <label>Alternating Row Offset</label>
-          <div class="slider-with-input">
-            <input type="range" id="stagger-offset" min="-100" max="100" value="0">
-            <input type="number" id="stagger-number" min="-100" max="100" value="0">
-          </div>
-        </div>
-      </div>
-    </div>
+
 
     <div class="section">
-      <div class="section-title" onclick="toggleSection(this)">Colors</div>
-      <div class="section-content">
+      <div class="section-title collapsed" onclick="toggleSection(this)">Colors</div>
+      <div class="section-content collapsed">
         <div class="color-picker-group">
           <label>Background</label>
           <input type="color" id="bg-color" value="#000000">
@@ -530,6 +526,13 @@
         <div class="color-picker-group">
           <label>Hover Stroke</label>
           <input type="color" id="stroke-color" value="#00DC00">
+        </div>
+
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="stroke-mode">
+            <span>Stroke Only Mode</span>
+          </label>
         </div>
 
         <div class="divider"></div>
@@ -556,12 +559,10 @@
             </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <div class="section">
-      <div class="section-title" onclick="toggleSection(this)">Color Palette (Max 4)</div>
-      <div class="section-content">
+        <div class="divider"></div>
+
+        <label>Color Palette (Max 4)</label>
         <p style="font-size: 11px; color: #888; margin-bottom: 12px;">Overrides single color & gradient</p>
 
         <div class="color-palette" id="color-palette"></div>
@@ -577,16 +578,23 @@
       </div>
     </div>
 
+
+
     <div class="section">
-      <div class="section-title" onclick="toggleSection(this)">Available Shapes</div>
-      <div class="section-content">
+      <div class="section-title collapsed" onclick="toggleSection(this)">Shape Module</div>
+      <div class="section-content collapsed">
         <div id="shape-checkboxes"></div>
+
+        <div class="divider"></div>
+
+        <p style="font-size: 11px; color: #888; margin-bottom: 12px;">Drag & drop SVG file onto canvas to add custom
+          shape</p>
       </div>
     </div>
 
     <div class="section">
-      <div class="section-title" onclick="toggleSection(this)">Image to Shapes</div>
-      <div class="section-content">
+      <div class="section-title collapsed" onclick="toggleSection(this)">Image to Shapes</div>
+      <div class="section-content collapsed">
         <p style="font-size: 11px; color: #888; margin-bottom: 12px;">Drag & drop PNG/JPG onto canvas</p>
 
         <div class="checkbox-group">
@@ -595,18 +603,18 @@
             <span>Invert Pixels</span>
           </label>
         </div>
+
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="extract-palette">
+            <span>Extract Palette (Max 4)</span>
+          </label>
+        </div>
       </div>
     </div>
 
     <div class="section">
-      <div class="section-title" onclick="toggleSection(this)">Add Custom SVG</div>
-      <div class="section-content">
-        <p style="font-size: 11px; color: #888; margin-bottom: 12px;">Drag & drop SVG file onto canvas</p>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title" onclick="toggleSection(this)">Export</div>
+      <div class="section-title collapsed" onclick="toggleSection(this)">Export</div>
       <div class="section-content">
         <div class="control-group">
           <label>Export Scale</label>
@@ -628,7 +636,7 @@
     <div class="divider"></div>
 
     <div class="instructions">
-      <p><strong>Click</strong> to place shapes</p>
+      <p><strong>Drag</strong> to change shape</p>
       <p><strong>Ctrl + Hover</strong> to cycle shapes</p>
       <p><strong>Alt + Drag</strong> to erase</p>
       <p><strong>Drop Image</strong> to convert to shapes</p>
@@ -795,6 +803,14 @@
 
     document.getElementById('invert-pixels').addEventListener('change', function (e) {
       toggleInvertPixels(e.target.checked);
+    });
+
+    document.getElementById('stroke-mode').addEventListener('change', function (e) {
+      toggleStrokeMode(e.target.checked);
+    });
+
+    document.getElementById('extract-palette').addEventListener('change', function (e) {
+      toggleExtractPalette(e.target.checked);
     });
 
     document.getElementById('add-color-btn').addEventListener('click', function () {
