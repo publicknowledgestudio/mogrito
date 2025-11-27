@@ -16,11 +16,33 @@ let config = {
   colorPalette: [],
   useColorPalette: false,
   randomSeed: 0,
-  lockAspect: false,
+  lockAspect: true, // Default to true for Scale mode
   invertPixels: false,
   customSVGs: [],
+  customSVGNames: [], // Store names for custom SVGs
   strokeMode: false,
-  extractPalette: false
+  extractPalette: false,
+  colStaggerOffset: 0,
+  animation: {
+    row: {
+      enabled: false,
+      type: 'sin',
+      amplitude: 20,
+      frequency: 0.1, // Slope
+      speed: 0.05
+    },
+    col: {
+      enabled: false,
+      type: 'sin',
+      amplitude: 20,
+      frequency: 0.1, // Slope
+      speed: 0.05
+    },
+    cycle: {
+      enabled: false,
+      speed: 0.1
+    }
+  }
 };
 
 const aspectRatios = {
@@ -54,6 +76,11 @@ function setup() {
   config.gradientColor = color(255, 107, 107);
 
   initGrid();
+
+  // Notify UI that we are ready
+  if (typeof refreshShapeUI === 'function') {
+    refreshShapeUI();
+  }
 }
 
 function initGrid() {
@@ -104,7 +131,7 @@ function handleFileDrop(file) {
   if (file.type === 'image') {
     if (file.subtype === 'svg+xml' || file.name.endsWith('.svg')) {
       loadImage(file.data, function (img) {
-        loadSVG(img);
+        loadSVG(img, file.name.replace('.svg', ''));
       });
     } else {
       loadImage(file.data, function (img) {
@@ -115,25 +142,16 @@ function handleFileDrop(file) {
   }
 }
 
-function loadSVG(svgImg) {
+function loadSVG(svgData, name = 'Custom Shape') {
   // Add SVG to custom shapes
-  const svgIndex = config.availableShapes.length + config.customSVGs.length; // This logic is a bit flawed if we remove shapes, but okay for append-only custom
-  // Better: Use a unique ID or just append to customSVGs and give it a special index range
-  // Current logic: 0-10 are built-in. 11+ are custom.
+  const svgIndex = 11 + config.customSVGs.length; // 0-10 are built-in
+  config.customSVGs.push(svgData);
+  config.customSVGNames.push(name);
+  config.availableShapes.push(svgIndex);
 
-  // We need to ensure we don't conflict with availableShapes indices if they are just numbers.
-  // Let's assume custom shapes start at 100 to be safe, or just continue from 11.
-  // The current code assumes continuous indices.
-
-  config.customSVGs.push(svgImg);
-  // The index for this new shape
-  const newShapeIndex = 10 + config.customSVGs.length;
-
-  config.availableShapes.push(newShapeIndex);
-
-  // Notify HTML to update checkboxes
-  if (typeof onSVGAdded === 'function') {
-    onSVGAdded(newShapeIndex);
+  // Notify HTML to update UI
+  if (typeof refreshShapeUI === 'function') {
+    refreshShapeUI();
   }
 }
 
@@ -223,14 +241,44 @@ function draw() {
 
   for (let i = 0; i < config.cols; i++) {
     for (let j = 0; j < config.rows; j++) {
-      const stagger = (j % 2 === 0) ? config.staggerOffset : -config.staggerOffset;
-      const posX = i * tileW + stagger;
-      const posY = j * tileH;
+      // Static Offsets (Shear/Progressive)
+      // User requested: "row * offset" instead of alternating
+      // We map slider 0-100 to a pixel value.
+      const rowShear = j * config.staggerOffset;
+      const colShear = i * config.colStaggerOffset;
+
+      let animOffsetX = 0;
+      let animOffsetY = 0;
+
+      // Row Animation (affects X)
+      if (config.animation.row.enabled) {
+        const time = frameCount * config.animation.row.speed;
+        const phase = config.animation.row.frequency * j; // Slope based on Row index
+        let wave = 0;
+        if (config.animation.row.type === 'sin') wave = sin(time + phase);
+        else if (config.animation.row.type === 'cos') wave = cos(time + phase);
+        else if (config.animation.row.type === 'noise') wave = noise(time + phase) * 2 - 1;
+        animOffsetX = wave * config.animation.row.amplitude;
+      }
+
+      // Column Animation (affects Y)
+      if (config.animation.col.enabled) {
+        const time = frameCount * config.animation.col.speed;
+        const phase = config.animation.col.frequency * i; // Slope based on Col index
+        let wave = 0;
+        if (config.animation.col.type === 'sin') wave = sin(time + phase);
+        else if (config.animation.col.type === 'cos') wave = cos(time + phase);
+        else if (config.animation.col.type === 'noise') wave = noise(time + phase) * 2 - 1;
+        animOffsetY = wave * config.animation.col.amplitude;
+      }
+
+      const posX = i * tileW + rowShear + animOffsetX;
+      const posY = j * tileH + colShear + animOffsetY;
 
       push();
       translate(posX, posY);
 
-      if (mouseOverCell(i, j, tileW, tileH, stagger)) {
+      if (mouseOverCell(i, j, tileW, tileH, rowShear + animOffsetX, colShear + animOffsetY)) { // Need to update mouseOver logic too!
         push();
         stroke(config.strokeColor);
         noFill();
@@ -240,7 +288,7 @@ function draw() {
       }
 
       if (!blockGrid[i][j] && shapeGrid[i][j] !== -1) {
-        if (mouseOverCell(i, j, tileW, tileH, stagger) &&
+        if (mouseOverCell(i, j, tileW, tileH, rowShear + animOffsetX, colShear + animOffsetY) &&
           keyIsPressed && keyCode === CONTROL) {
           if (frameCount - frameTrack[i][j] > cycleDelay) {
             const currentIdx = config.availableShapes.indexOf(shapeGrid[i][j]);
@@ -249,7 +297,23 @@ function draw() {
             frameTrack[i][j] = frameCount;
           }
         }
-        drawShape(shapeGrid[i][j], tileW, tileH, i, j);
+
+        let shapeToDraw = shapeGrid[i][j];
+
+        // Cycle Animation
+        if (config.animation.cycle.enabled && config.availableShapes.length > 0) {
+          // We want to cycle through available shapes.
+          // shapeGrid[i][j] is the base shape.
+          // We can offset the index in availableShapes.
+          const currentIdx = config.availableShapes.indexOf(shapeGrid[i][j]);
+          if (currentIdx !== -1) {
+            const cycleOffset = floor(frameCount * config.animation.cycle.speed);
+            const nextIdx = (currentIdx + cycleOffset) % config.availableShapes.length;
+            shapeToDraw = config.availableShapes[nextIdx];
+          }
+        }
+
+        drawShape(shapeToDraw, tileW, tileH, i, j);
       }
       pop();
     }
@@ -404,9 +468,9 @@ function drawShapeGeometry(index, tileW, tileH, tintColor) {
   }
 }
 
-function mouseOverCell(i, j, tileW, tileH, stagger) {
-  const cellX = i * tileW + stagger;
-  const cellY = j * tileH;
+function mouseOverCell(i, j, tileW, tileH, offsetX, offsetY) {
+  const cellX = i * tileW + offsetX;
+  const cellY = j * tileH + offsetY;
   return mouseX >= cellX && mouseX < cellX + tileW &&
     mouseY >= cellY && mouseY < cellY + tileH;
 }
@@ -534,30 +598,27 @@ function clearCell(x, y) {
 }
 
 // GUI CONTROL FUNCTIONS
+function updateScale(value) {
+  config.cols = parseInt(value);
+  // Enforce square cells: tileW = tileH
+  // tileW = width / cols
+  // tileH = height / rows
+  // width / cols = height / rows => rows = cols * (height / width)
+  config.rows = Math.round(config.cols * (canvasHeight / canvasWidth));
+
+  // We don't round rows here to keep aspect ratio precise, 
+  // but the grid loop needs to handle it (use ceil for loop limit).
+
+  initGrid();
+}
+
 function updateCols(value) {
   config.cols = value;
-  if (config.lockAspect) {
-    // Maintain square cells: tileW = tileH
-    // tileW = width / cols
-    // tileH = height / rows
-    // width / cols = height / rows => rows = cols * (height / width)
-    config.rows = Math.max(1, Math.round(value * (canvasHeight / canvasWidth)));
-    if (typeof updateRowsDisplay === 'function') {
-      updateRowsDisplay(config.rows);
-    }
-  }
   initGrid();
 }
 
 function updateRows(value) {
   config.rows = value;
-  if (config.lockAspect) {
-    // cols = rows * (width / height)
-    config.cols = Math.max(1, Math.round(value * (canvasWidth / canvasHeight)));
-    if (typeof updateColsDisplay === 'function') {
-      updateColsDisplay(config.cols);
-    }
-  }
   initGrid();
 }
 
@@ -723,9 +784,10 @@ function updateRandomSeed(value) {
 function toggleLockAspect(locked) {
   config.lockAspect = locked;
   if (locked) {
-    config.rows = config.cols;
+    // When locking, re-calculate rows based on current cols to maintain aspect ratio
+    config.rows = Math.round(config.cols * (canvasHeight / canvasWidth));
     if (typeof updateRowsDisplay === 'function') {
-      updateRowsDisplay(config.cols);
+      updateRowsDisplay(config.rows);
     }
     initGrid();
   }
@@ -792,24 +854,38 @@ function drawShapeOnGraphics(g, index, tileW, tileH, i, j) {
   // Check if it's a custom SVG
   const customIndex = index - 11;
   if (customIndex >= 0 && customIndex < config.customSVGs.length) {
-    // Draw custom SVG (simplified - you'd need proper SVG parsing)
-    g.rect(0, 0, tileW, tileH);
+    const img = config.customSVGs[customIndex];
+    // For saving, we want to apply the fill color directly to the SVG if possible.
+    // P5.js image() function doesn't directly support tinting SVG with a fillStyle gradient.
+    // If we have a tintColor, we can use the shapeBuffer masking approach.
+    // Otherwise, just draw the SVG as is.
+    if (g.drawingContext.fillStyle && typeof g.drawingContext.fillStyle === 'string') {
+      // If fillStyle is a simple color string, we can use tint.
+      g.tint(g.color(g.drawingContext.fillStyle));
+      g.image(img, 0, 0, tileW, tileH);
+      g.noTint(); // Reset tint
+    } else {
+      // For gradients or complex fills, just draw the SVG as is.
+      // Or, if we want to force a color, we'd need to re-implement the masking logic here.
+      // For now, let's just draw it.
+      g.image(img, 0, 0, tileW, tileH);
+    }
     return;
   }
 
   switch (index) {
-    case 0:
+    case 0: // Circle
       g.translate(tileW / 2, tileH / 2);
       g.ellipse(0, 0, tileW, tileH);
       break;
-    case 1:
+    case 1: // Half Rect Bottom
       g.translate(0, tileH / 2);
       g.rect(0, 0, tileW, tileH * 0.5);
       break;
-    case 2:
+    case 2: // Half Rect Top
       g.rect(0, 0, tileW, tileH * 0.5);
       break;
-    case 3:
+    case 3: // Trapezoid Left
       g.beginShape();
       g.vertex(0, 0);
       g.vertex(tileW / 2, 0);
@@ -817,7 +893,7 @@ function drawShapeOnGraphics(g, index, tileW, tileH, i, j) {
       g.vertex(tileW / 2, tileH);
       g.endShape(CLOSE);
       break;
-    case 4:
+    case 4: // Trapezoid Right
       g.beginShape();
       g.vertex(tileW, 0);
       g.vertex(tileW / 2, 0);
@@ -825,7 +901,7 @@ function drawShapeOnGraphics(g, index, tileW, tileH, i, j) {
       g.vertex(tileW / 2, tileH);
       g.endShape(CLOSE);
       break;
-    case 5:
+    case 5: // Half Left
       g.beginShape();
       g.vertex(0, 0);
       g.vertex(tileW / 2, 0);
@@ -833,7 +909,7 @@ function drawShapeOnGraphics(g, index, tileW, tileH, i, j) {
       g.vertex(0, tileH);
       g.endShape(CLOSE);
       break;
-    case 6:
+    case 6: // Half Right
       g.beginShape();
       g.vertex(tileW, 0);
       g.vertex(tileW / 2, 0);
@@ -841,17 +917,141 @@ function drawShapeOnGraphics(g, index, tileW, tileH, i, j) {
       g.vertex(tileW, tileH);
       g.endShape(CLOSE);
       break;
-    case 7:
+    case 7: // Quarter Circle TL (Wait, index 7 in drawShapeGeometry is QC TL)
+      // In drawShapeGeometry:
+      // case 7: arc(0, 0, tileW * 2, tileH * 2, 0, HALF_PI);
+      // Here (old code): translate, rotate rect? That was wrong.
+      // Let's match drawShapeGeometry exactly.
       g.arc(0, 0, tileW * 2, tileH * 2, 0, HALF_PI);
       break;
-    case 8:
+    case 8: // Quarter Circle TR
+      // case 8: arc(tileW, 0, tileW * 2, tileH * 2, HALF_PI, PI);
       g.arc(tileW, 0, tileW * 2, tileH * 2, HALF_PI, PI);
       break;
-    case 9:
+    case 9: // Quarter Circle BR
+      // case 9: arc(tileW, tileH, tileW * 2, tileH * 2, PI, PI + HALF_PI);
       g.arc(tileW, tileH, tileW * 2, tileH * 2, PI, PI + HALF_PI);
       break;
-    case 10:
+    case 10: // Quarter Circle BL
+      // case 10: arc(0, tileH, tileW * 2, tileH * 2, PI + HALF_PI, TWO_PI);
       g.arc(0, tileH, tileW * 2, tileH * 2, PI + HALF_PI, TWO_PI);
       break;
   }
 }
+
+function updateColStaggerOffset(value) {
+  config.colStaggerOffset = value;
+}
+
+function updateAnimation(category, params) {
+  if (!config.animation[category]) return;
+
+  if (params.enabled !== undefined) config.animation[category].enabled = params.enabled;
+  if (params.type !== undefined) config.animation[category].type = params.type;
+  if (params.amplitude !== undefined) config.animation[category].amplitude = params.amplitude;
+  if (params.frequency !== undefined) config.animation[category].frequency = params.frequency;
+  if (params.speed !== undefined) config.animation[category].speed = params.speed;
+}
+
+// Expose
+window.updateColStaggerOffset = updateColStaggerOffset;
+window.updateAnimation = updateAnimation;
+
+// --- New Helper Functions for UI ---
+
+function generateShapeIcon(index) {
+  const size = 40;
+  const g = createGraphics(size, size);
+  g.background(255, 0); // Transparent
+
+  // Draw shape in black/gray for icon
+  g.fill(100);
+  g.noStroke();
+  g.rectMode(CENTER);
+  g.ellipseMode(CENTER);
+
+  // Reset transformations on g
+  g.reset();
+
+  // Draw
+  g.fill(50);
+  g.noStroke();
+
+  // Handle Custom SVG for icon
+  if (index > 10) {
+    const customIndex = index - 11;
+    if (customIndex >= 0 && customIndex < config.customSVGs.length) {
+      const img = config.customSVGs[customIndex];
+      // Draw scaled image
+      g.image(img, 0, 0, size, size);
+    }
+  } else {
+    drawShapeOnGraphics(g, index, size, size, 0, 0);
+  }
+
+  return g.canvas.toDataURL();
+}
+
+function removeCustomSVG(index) {
+  // index is the index in customSVGs array (0-based)
+  if (index >= 0 && index < config.customSVGs.length) {
+    // Remove from arrays
+    config.customSVGs.splice(index, 1);
+    config.customSVGNames.splice(index, 1);
+
+    // The shape index for this custom shape was 11 + index.
+    // But if we remove one, all subsequent custom shapes shift down.
+    // We need to rebuild availableShapes to reflect this shift.
+    // Simplest way: Clear availableShapes of all custom ones, then re-add valid ones?
+
+    // Let's just reset availableShapes to defaults + current custom ones
+    const newAvailable = config.availableShapes.filter(id => id <= 10);
+    for (let i = 0; i < config.customSVGs.length; i++) {
+      newAvailable.push(11 + i);
+    }
+    config.availableShapes = newAvailable;
+
+    // Also need to clean up grid? 
+    // Any cell using the removed shape (or shifted ones) will be wrong.
+    // Simplest: Reset grid or replace invalid shapes.
+    // Let's replace invalid shapes with -1.
+    for (let c = 0; c < config.cols; c++) {
+      for (let r = 0; r < config.rows; r++) {
+        if (shapeGrid[c][r] > 10) {
+          // It was a custom shape. 
+          // Since we re-indexed, we should probably just clear them to be safe.
+          shapeGrid[c][r] = -1;
+        }
+      }
+    }
+
+    if (typeof refreshShapeUI === 'function') {
+      refreshShapeUI();
+    }
+  }
+}
+
+function renameCustomSVG(index, newName) {
+  if (index >= 0 && index < config.customSVGNames.length) {
+    config.customSVGNames[index] = newName;
+  }
+}
+
+function getCustomSVGs() {
+  return config.customSVGNames.map((name, i) => ({ name, index: i }));
+}
+
+function addCustomSVG(svgData, name) {
+  loadSVG(svgData, name);
+}
+
+// Expose to window
+window.updateScale = updateScale;
+window.generateShapeIcon = generateShapeIcon;
+window.removeCustomSVG = removeCustomSVG;
+window.renameCustomSVG = renameCustomSVG;
+window.getCustomSVGs = getCustomSVGs;
+window.toggleShape = toggleShape;
+window.addCustomSVG = addCustomSVG;
+window.updateColStaggerOffset = updateColStaggerOffset;
+window.updateAnimation = updateAnimation;

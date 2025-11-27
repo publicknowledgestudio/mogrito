@@ -138,6 +138,7 @@
       background: #2a2a2a;
       outline: none;
       -webkit-appearance: none;
+      appearance: none;
     }
 
     input[type="range"]::-webkit-slider-thumb {
@@ -440,6 +441,95 @@
     .gradient-type-btn:hover {
       border-color: #555;
     }
+
+    .control-group-header {
+      font-size: 11px;
+      font-weight: bold;
+      color: #00DC00;
+      margin-top: 8px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+
+    /* Shape Icons Grid */
+    .shape-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .shape-icon-btn {
+      width: 40px;
+      height: 40px;
+      border: 2px solid #333;
+      border-radius: 4px;
+      background: #222;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px;
+      transition: all 0.2s;
+    }
+
+    .shape-icon-btn img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      filter: invert(1);
+      /* Make black icons white */
+    }
+
+    .shape-icon-btn.active {
+      border-color: #00DC00;
+      background: #2a2a2a;
+    }
+
+    .shape-icon-btn:hover {
+      border-color: #666;
+    }
+
+    /* Custom SVG List */
+    .custom-svg-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .custom-svg-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #222;
+      padding: 6px;
+      border-radius: 4px;
+    }
+
+    .custom-svg-item input {
+      flex: 1;
+      background: transparent;
+      border: 1px solid #444;
+      color: #eee;
+      padding: 4px;
+      border-radius: 2px;
+      font-size: 12px;
+    }
+
+    .custom-svg-item button {
+      background: #ff4444;
+      color: white;
+      border: none;
+      border-radius: 2px;
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
   </style>
 </head>
 
@@ -450,26 +540,27 @@
     <div class="section">
       <div class="section-title collapsed" onclick="toggleSection(this)">Grid Layout</div>
       <div class="section-content collapsed">
-        <div class="checkbox-group" style="margin-bottom: 12px;">
-          <label class="checkbox-label">
-            <input type="checkbox" id="lock-aspect">
-            <span>Lock Aspect Ratio</span>
-          </label>
-        </div>
-
         <div class="control-group">
-          <label>Columns</label>
+          <label>Scale (Grid Density)</label>
           <div class="slider-with-input">
-            <input type="range" id="cols" min="2" max="200" value="3">
-            <input type="number" id="cols-number" min="2" max="200" value="3">
+            <input type="range" id="scale-slider" min="2" max="50" value="4">
+            <input type="number" id="scale-number" min="2" max="50" value="4">
           </div>
         </div>
 
         <div class="control-group">
-          <label>Rows</label>
+          <label>Row Offset</label>
           <div class="slider-with-input">
-            <input type="range" id="rows" min="2" max="200" value="4">
-            <input type="number" id="rows-number" min="2" max="200" value="4">
+            <input type="range" id="stagger-offset" min="0" max="100" value="0">
+            <input type="number" id="stagger-number" min="0" max="100" value="0">
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label>Column Offset</label>
+          <div class="slider-with-input">
+            <input type="range" id="col-stagger-offset" min="0" max="100" value="0">
+            <input type="number" id="col-stagger-number" min="0" max="100" value="0">
           </div>
         </div>
 
@@ -583,12 +674,103 @@
     <div class="section">
       <div class="section-title collapsed" onclick="toggleSection(this)">Shape Module</div>
       <div class="section-content collapsed">
-        <div id="shape-checkboxes"></div>
+        <div id="shape-icons-grid" class="shape-grid"></div>
 
         <div class="divider"></div>
 
-        <p style="font-size: 11px; color: #888; margin-bottom: 12px;">Drag & drop SVG file onto canvas to add custom
-          shape</p>
+        <div class="control-group">
+          <label>Add Custom SVG</label>
+          <input type="file" id="svg-upload" accept=".svg" style="width: 100%; font-size: 12px; color: #888;">
+        </div>
+
+        <div id="custom-svg-list" class="custom-svg-list"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title collapsed" onclick="toggleSection(this)">Animation</div>
+      <div class="section-content collapsed">
+
+        <!-- Row Motion -->
+        <div class="control-group-header">Row Motion (X-Axis)</div>
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="anim-row-enabled" onchange="updateAnimParams('row')">
+            <span>Enable</span>
+          </label>
+        </div>
+        <div class="control-group">
+          <label>Type</label>
+          <select id="anim-row-type" onchange="updateAnimParams('row')">
+            <option value="sin">Sine</option>
+            <option value="cos">Cosine</option>
+            <option value="noise">Noise</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Amplitude</label>
+          <input type="range" id="anim-row-amp" min="0" max="100" value="20" oninput="updateAnimParams('row')">
+        </div>
+        <div class="control-group">
+          <label>Frequency (Slope)</label>
+          <input type="range" id="anim-row-freq" min="0.01" max="1.0" step="0.01" value="0.1"
+            oninput="updateAnimParams('row')">
+        </div>
+        <div class="control-group">
+          <label>Speed</label>
+          <input type="range" id="anim-row-speed" min="0.01" max="0.2" step="0.01" value="0.05"
+            oninput="updateAnimParams('row')">
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Col Motion -->
+        <div class="control-group-header">Column Motion (Y-Axis)</div>
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="anim-col-enabled" onchange="updateAnimParams('col')">
+            <span>Enable</span>
+          </label>
+        </div>
+        <div class="control-group">
+          <label>Type</label>
+          <select id="anim-col-type" onchange="updateAnimParams('col')">
+            <option value="sin">Sine</option>
+            <option value="cos">Cosine</option>
+            <option value="noise">Noise</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Amplitude</label>
+          <input type="range" id="anim-col-amp" min="0" max="100" value="20" oninput="updateAnimParams('col')">
+        </div>
+        <div class="control-group">
+          <label>Frequency (Slope)</label>
+          <input type="range" id="anim-col-freq" min="0.01" max="1.0" step="0.01" value="0.1"
+            oninput="updateAnimParams('col')">
+        </div>
+        <div class="control-group">
+          <label>Speed</label>
+          <input type="range" id="anim-col-speed" min="0.01" max="0.2" step="0.01" value="0.05"
+            oninput="updateAnimParams('col')">
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Cycle Animation -->
+        <div class="control-group-header">Cycle Shapes</div>
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="anim-cycle-enabled" onchange="updateAnimParams('cycle')">
+            <span>Enable</span>
+          </label>
+        </div>
+        <div class="control-group">
+          <label>Speed</label>
+          <input type="range" id="anim-cycle-speed" min="0.01" max="0.5" step="0.01" value="0.1"
+            oninput="updateAnimParams('cycle')">
+        </div>
+
       </div>
     </div>
 
@@ -665,38 +847,86 @@
       content.classList.toggle('collapsed');
     }
 
-    // Initialize shape checkboxes
-    const shapeCheckboxContainer = document.getElementById('shape-checkboxes');
-    shapeNames.forEach(function (name, idx) {
-      const label = document.createElement('label');
-      label.className = 'checkbox-label';
-      label.innerHTML = '<input type="checkbox" class="shape-checkbox" data-shape="' + idx + '" checked><span>' + name + '</span>';
-      shapeCheckboxContainer.appendChild(label);
-    });
+    // Refresh Shape UI (Icons & Custom List)
+    function refreshShapeUI() {
+      if (typeof config === 'undefined') return;
 
-    // Add SVG callback
-    function onSVGAdded(index) {
-      const label = document.createElement('label');
-      label.className = 'checkbox-label';
-      label.innerHTML = '<input type="checkbox" class="shape-checkbox" data-shape="' + index + '" checked><span>Custom SVG ' + (index - 10) + '</span>';
-      shapeCheckboxContainer.appendChild(label);
+      // 1. Update Icons Grid
+      const grid = document.getElementById('shape-icons-grid');
+      grid.innerHTML = '';
 
-      label.querySelector('input').addEventListener('change', function (e) {
-        const shapeIdx = parseInt(e.target.dataset.shape);
-        toggleShape(shapeIdx, e.target.checked);
+      // Total shapes = 11 built-in + custom SVGs
+      const totalShapes = 11 + config.customSVGs.length;
+
+      for (let i = 0; i < totalShapes; i++) {
+        const btn = document.createElement('div');
+        btn.className = 'shape-icon-btn';
+
+        // Check if active (in availableShapes)
+        const isActive = config.availableShapes.indexOf(i) > -1;
+        if (isActive) btn.classList.add('active');
+
+        // Generate Icon
+        const iconUrl = generateShapeIcon(i);
+        const img = document.createElement('img');
+        img.src = iconUrl;
+        btn.appendChild(img);
+
+        // Click handler
+        btn.onclick = function () {
+          const currentlyActive = btn.classList.contains('active');
+          toggleShape(i, !currentlyActive);
+          // UI update will happen via refreshShapeUI if toggleShape calls it? 
+          // toggleShape in sketch.js doesn't call refreshShapeUI currently.
+          // We should update UI locally or make toggleShape call it.
+          // Let's update locally for responsiveness.
+          if (!currentlyActive) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        };
+
+        grid.appendChild(btn);
+      }
+
+      // 2. Update Custom SVG List
+      const list = document.getElementById('custom-svg-list');
+      list.innerHTML = '';
+
+      config.customSVGs.forEach((svg, idx) => {
+        const item = document.createElement('div');
+        item.className = 'custom-svg-item';
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.value = config.customSVGNames[idx] || ('Custom ' + (idx + 1));
+        nameInput.onchange = (e) => {
+          renameCustomSVG(idx, e.target.value);
+        };
+
+        const removeBtn = document.createElement('button');
+        removeBtn.innerHTML = '×';
+        removeBtn.title = 'Remove Shape';
+        removeBtn.onclick = () => {
+          if (confirm('Remove this custom shape?')) {
+            removeCustomSVG(idx);
+            // removeCustomSVG calls refreshShapeUI, so we don't need to do anything
+          }
+        };
+
+        item.appendChild(nameInput);
+        item.appendChild(removeBtn);
+        list.appendChild(item);
       });
     }
 
-    // Display update functions for locked aspect
-    function updateRowsDisplay(value) {
-      document.getElementById('rows').value = value;
-      document.getElementById('rows-number').value = value;
-    }
+    // Call initially after a short delay to ensure p5 is ready
+    // Removed setTimeout as we now call it from sketch.js setup()
+    // setTimeout(refreshShapeUI, 500);
 
-    function updateColsDisplay(value) {
-      document.getElementById('cols').value = value;
-      document.getElementById('cols-number').value = value;
-    }
+    // Display update functions for locked aspect
+
 
     // Color palette management
     function updatePaletteDisplay() {
@@ -732,30 +962,87 @@
       const number = document.getElementById(numberId);
 
       slider.addEventListener('input', function (e) {
-        const value = parseInt(e.target.value);
+        const value = parseFloat(e.target.value); // Use parseFloat for potential decimal values
         number.value = value;
         callback(value);
       });
 
       number.addEventListener('input', function (e) {
-        const value = parseInt(e.target.value);
+        const value = parseFloat(e.target.value); // Use parseFloat for potential decimal values
         slider.value = value;
         callback(value);
       });
     }
 
     // Event listeners
-    syncSliderAndNumber('cols', 'cols-number', updateCols);
-    syncSliderAndNumber('rows', 'rows-number', updateRows);
+    syncSliderAndNumber('scale-slider', 'scale-number', updateScale);
+    // syncSliderAndNumber('cols', 'cols-number', updateCols); // Removed
     syncSliderAndNumber('stagger-offset', 'stagger-number', updateStaggerOffset);
+    syncSliderAndNumber('col-stagger-offset', 'col-stagger-number', updateColStaggerOffset);
     syncSliderAndNumber('random-seed', 'random-seed-number', function (value) {
       updateRandomSeed(value);
       fillRandomly(); // Auto-shuffle when seed changes
     });
 
-    document.getElementById('lock-aspect').addEventListener('change', function (e) {
-      toggleLockAspect(e.target.checked);
+    // SVG Upload
+    document.getElementById('svg-upload').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          // P5 loadImage is asynchronous and returns a p5.Image object
+          loadImage(event.target.result, function (loadedImg) {
+            // Remove extension from name
+            const name = file.name.replace(/\.[^/.]+$/, "");
+            // Call the global function exposed from sketch.js
+            if (window.addCustomSVG) {
+              window.addCustomSVG(loadedImg, name);
+            } else {
+              console.error("addCustomSVG not found. Make sure it's exposed in sketch.js");
+            }
+          });
+        };
+        reader.readAsDataURL(file);
+      }
     });
+
+    // Animation Controls
+    function updateAnimParams(category) {
+      const params = {};
+
+      if (category === 'row') {
+        params.enabled = document.getElementById('anim-row-enabled').checked;
+        params.type = document.getElementById('anim-row-type').value;
+        params.amplitude = parseFloat(document.getElementById('anim-row-amp').value);
+        params.frequency = parseFloat(document.getElementById('anim-row-freq').value);
+        params.speed = parseFloat(document.getElementById('anim-row-speed').value);
+      } else if (category === 'col') {
+        params.enabled = document.getElementById('anim-col-enabled').checked;
+        params.type = document.getElementById('anim-col-type').value;
+        params.amplitude = parseFloat(document.getElementById('anim-col-amp').value);
+        params.frequency = parseFloat(document.getElementById('anim-col-freq').value);
+        params.speed = parseFloat(document.getElementById('anim-col-speed').value);
+      } else if (category === 'cycle') {
+        params.enabled = document.getElementById('anim-cycle-enabled').checked;
+        params.speed = parseFloat(document.getElementById('anim-cycle-speed').value);
+      }
+
+      if (typeof updateAnimation === 'function') {
+        updateAnimation(category, params);
+      } else {
+        console.error("updateAnimation function not found in sketch.js");
+      }
+    }
+
+    // Expose to window so HTML onchange can call it
+    window.updateAnimParams = updateAnimParams;
+
+    // Remove old listeners
+    // document.getElementById('anim-enabled').addEventListener...
+
+    // Lock aspect is now implicit in Scale mode, but we kept the checkbox in sketch config?
+    // We removed the checkbox from HTML. So this listener will fail if element is missing.
+    // document.getElementById('lock-aspect').addEventListener... -> Remove this.
 
     document.getElementById('aspect-ratio').addEventListener('change', function (e) {
       updateAspectRatio(e.target.value);
